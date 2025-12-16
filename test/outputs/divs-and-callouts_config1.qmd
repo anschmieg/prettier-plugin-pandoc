@@ -2,38 +2,38 @@
 
 ## Simple Div
 
-\::: {.my-class}
+::: {.my-class}
 This is content inside a div.
-\:::
+:::
 
 ## Callout Example
 
-\::: {.callout-note}
+::: {.callout-note}
 
 ## Important Note
 
 This is a callout note with **bold** and *italic* text.
-\:::
+:::
 
 ## Nested Divs
 
-\::: {.outer}
+::: {.outer}
 Outer content
 
-\::: {.inner}
+::: {.inner}
 Inner content
-\:::
+:::
 
 More outer content
-\:::
+:::
 
 ## Callout with ID
 
-\::: {#tip-example .callout-tip}
+::: {#tip-example .callout-tip}
 
 ## Cross-Referencing a Tip
 
 Add an ID starting with `#tip-` to reference a tip.
-\:::
+:::
 
 See @tip-example for more info.
