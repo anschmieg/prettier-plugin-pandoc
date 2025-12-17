@@ -57,12 +57,6 @@ export const printer: Printer<ASTNode> = {
 
               const attrStr = attrs.length > 0 ? ` {${attrs.join(' ')}}` : ''
               return `$$\n${content.trim()}\n$$${attrStr}`
-
-              // If we passed the full label string in preprocessing as a class or something?
-              // In preprocess.ts I did: `::: math ${attrs}`
-              // micromark parses `::: math {#eq}` as attributes.id = eq.
-
-              return `$$\n${content.trim()}\n$$${idStr}`
             }
 
             // Always output Pandoc fenced div syntax (with :::, not longer fences)

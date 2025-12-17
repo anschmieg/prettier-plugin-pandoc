@@ -109,8 +109,23 @@ $$ {#eq-bs}
 
 - **Prettier:** `^3.0.0`
 - **Node.js:** `>=18.0.0` (ES modules)
+- **Browser:** Bundled version available (55KB gzipped)
 - **Pandoc:** Tested with Pandoc 3.1+
 - **Quarto:** Tested with Quarto 1.4+
+
+## Browser Usage
+
+A pre-bundled version is available for browser applications:
+
+```javascript
+import * as prettier from 'prettier/standalone'
+import pandocPlugin from 'prettier-plugin-pandoc/browser'
+
+const formatted = await prettier.format(markdown, {
+  parser: 'pandoc',
+  plugins: [pandocPlugin],
+})
+```
 
 ## Development
 
