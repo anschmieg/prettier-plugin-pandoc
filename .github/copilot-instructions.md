@@ -13,14 +13,15 @@ A production-grade Prettier plugin to provide full formatting support for Quarto
 ## Architecture Guidelines
 
 ### 1. AST Extension Strategy (Critical)
-We use **AST Extension**, NOT Regex masking.
-*   **Parsing**: Use `micromark` extensions to tokenize Quarto syntax into proper AST nodes.
-    *   Use `micromark-extension-directive` for Divs (`:::`) and Spans.
-    *   Write custom regular expressions or micromark state machines only for unique Quarto constructs like `$$ {#eq}` if standard directives don't cover it.
-*   **AST**: Map tokens to `mdast` nodes (e.g., `containerDirective`, `textDirective`, `leafDirective`).
+We use **True AST Extension**, NOT Regex masking or plain text preservation.
+*   **Parsing**: You **MUST** use `micromark` extensions.
+    *   **Divs/Spans**: `micromark-extension-directive` + `mdast-util-directive`.
+    *   **Math**: `micromark-extension-math` + `mdast-util-math`.
+*   **AST**: Map tokens to `mdast` nodes (`containerDirective`, `math`).
+    *   **Forbidden**: Parsing `:::` or `$$` as `paragraph` or `text`.
 *   **Printing**: Extend the Prettier Markdown printer to output these nodes.
-    *   Ensure nested content in Divs is indented correctly.
-    *   Preserve and format attributes (e.g., `{.class key="val"}`).
+    *   Reconstruct the fence `:::` from the node data.
+    *   Format attributes `{key="val"}` properly.
 
 ### 2. Embedded Languages
 Code blocks (R, Python, Julia, Observable) are handled via Prettier's `embed()` API.
