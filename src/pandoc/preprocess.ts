@@ -18,9 +18,10 @@ import { getProtectedRanges, isProtected } from './safety'
 
 export interface PreprocessOptions {
   enableShortcodes?: boolean
+  enableMathLabels?: boolean // Quarto-specific: $$ {#eq:label}
 }
 
-export function preprocessPandocSyntax(text: string, options: PreprocessOptions = { enableShortcodes: true }): string {
+export function preprocessPandocSyntax(text: string, options: PreprocessOptions = { enableShortcodes: true, enableMathLabels: true }): string {
   const protectedRanges = getProtectedRanges(text)
   const lines = text.split('\n')
   const result: string[] = []
@@ -35,8 +36,8 @@ export function preprocessPandocSyntax(text: string, options: PreprocessOptions 
     // Calculate start offset of this line
     // currentOffset is at the start of the line
 
-    // 1. Handle Math Blocks with Labels
-    if (line.trim().startsWith('$$')) {
+    // 1. Handle Math Blocks with Labels (Quarto-specific)
+    if (options.enableMathLabels && line.trim().startsWith('$$')) {
       // Check if this line is protected (e.g. inside a code block)
       // Check the position of '$$'
       const matchIndex = line.indexOf('$$')
@@ -72,7 +73,7 @@ export function preprocessPandocSyntax(text: string, options: PreprocessOptions 
 
             mathBuffer = []
             // Update offset and continue
-            currentOffset += line.length + 1 // +1 for newline
+            currentOffset += line.length + 1
             continue
           }
           else {

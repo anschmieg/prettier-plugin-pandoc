@@ -50,7 +50,11 @@ export const pandocParser: Parser<ASTNode> = {
   locEnd,
   async parse(text: string) {
     // enableShortcodes: false ensures {{< >}} are treated as plain text
-    const preprocessed = preprocessPandocSyntax(text, { enableShortcodes: false })
+    // enableMathLabels: false ensures $$ {#label} is not processed (not standard Pandoc)
+    const preprocessed = preprocessPandocSyntax(text, {
+      enableShortcodes: false,
+      enableMathLabels: false,
+    })
 
     const tree = fromMarkdown(preprocessed, {
       extensions,
@@ -68,7 +72,11 @@ export const quartoParser: Parser<ASTNode> = {
   locEnd,
   async parse(text: string) {
     // enableShortcodes: true converts {{< >}} to ::shortcode directives
-    const preprocessed = preprocessPandocSyntax(text, { enableShortcodes: true })
+    // enableMathLabels: true converts $$ {#label} to :::math{#label} (Quarto-specific)
+    const preprocessed = preprocessPandocSyntax(text, {
+      enableShortcodes: true,
+      enableMathLabels: true,
+    })
 
     const tree = fromMarkdown(preprocessed, {
       extensions,

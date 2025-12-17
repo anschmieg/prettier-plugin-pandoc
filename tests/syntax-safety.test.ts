@@ -34,9 +34,9 @@ describe('math Safety', () => {
     expect(formatted).toContain('`$$ ... $$`')
   })
 
-  it('labeled math preserves all attributes', async () => {
+  it('labeled math preserves all attributes (Quarto only)', async () => {
     const input = '$$\nx^2\n$$ {#eq:test .important key="value"}'
-    const formatted = await format(input)
+    const formatted = await format(input, quartoParser)
 
     expect(formatted).toContain('{#eq:test')
     expect(formatted).toContain('.important')
@@ -51,12 +51,23 @@ describe('math Safety', () => {
     expect(formatted).toContain('E=mc^2')
   })
 
-  it('single-line math with label', async () => {
+  it('single-line math with label (Quarto only)', async () => {
     const input = '$$ E=mc^2 $$ {#eq:inline}'
-    const formatted = await format(input)
+    const formatted = await format(input, quartoParser)
 
     expect(formatted).toContain('E=mc^2')
     expect(formatted).toContain('{#eq:inline')
+  })
+
+  it('pandoc parser treats labeled math as plain math', async () => {
+    const input = '$$\nE=mc^2\n$$ {#eq:test}'
+    const ast = await pandocParser.parse(input, {}, {})
+
+    // Should be a plain math node, not a directive
+    const mathNode = ast.children[0]
+    expect(mathNode.type).toBe('math')
+    // Label is part of the content
+    expect(mathNode.value).toContain('{#eq:test}')
   })
 })
 
