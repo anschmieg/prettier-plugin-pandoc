@@ -20,40 +20,64 @@ import {
 } from './pandoc'
 import { preprocessPandocSyntax } from './pandoc/preprocess'
 
-export const parser: Parser<ASTNode> = {
-  astFormat,
-  locStart(node: any) {
-    return node.position?.start.offset ?? 0
-  },
-  locEnd(node: any) {
-    return node.position?.end.offset ?? 0
-  },
-  async parse(text: string) {
-    // Pre-process Pandoc fenced div syntax to be compatible with micromark-extension-directive
-    // This handles nested divs by using different colon counts for different nesting levels
-    const preprocessed = preprocessPandocSyntax(text)
+// Shared configuration
+const extensions = [
+  directiveExtension(),
+  mathExtension(),
+  frontmatterExtension,
+  gfmExtension(),
+  definitionListExtension, // Definition Lists
+  citationExtension({}), // Citations
+]
 
-    // Parse markdown with all Pandoc and Quarto extensions
-    // This enables True AST parsing for divs, math, frontmatter, tables, etc.
+const mdastExtensions = [
+  directiveFromMarkdownExtension(),
+  mathFromMarkdownExtension(),
+  frontmatterFromMarkdownExtension,
+  gfmFromMarkdownExtension(),
+  definitionListFromMarkdownExtension,
+  citationFromMarkdownExtension,
+]
+
+// Base helpers
+const locStart = (node: any) => node.position?.start.offset ?? 0
+const locEnd = (node: any) => node.position?.end.offset ?? 0
+
+// 1. Pandoc Parser (Standard extensions, NO Shortcodes)
+export const pandocParser: Parser<ASTNode> = {
+  astFormat,
+  locStart,
+  locEnd,
+  async parse(text: string) {
+    // enableShortcodes: false ensures {{< >}} are treated as plain text
+    const preprocessed = preprocessPandocSyntax(text, { enableShortcodes: false })
+
     const tree = fromMarkdown(preprocessed, {
-      extensions: [
-        directiveExtension(),
-        mathExtension(),
-        frontmatterExtension,
-        gfmExtension(),
-        definitionListExtension, // Definition Lists
-        citationExtension({}), // Citations
-      ],
-      mdastExtensions: [
-        directiveFromMarkdownExtension(),
-        mathFromMarkdownExtension(),
-        frontmatterFromMarkdownExtension,
-        gfmFromMarkdownExtension(),
-        definitionListFromMarkdownExtension,
-        citationFromMarkdownExtension,
-      ],
+      extensions,
+      mdastExtensions,
     })
 
     return tree
   },
 }
+
+// 2. Quarto Parser (Pandoc + Shortcodes)
+export const quartoParser: Parser<ASTNode> = {
+  astFormat,
+  locStart,
+  locEnd,
+  async parse(text: string) {
+    // enableShortcodes: true converts {{< >}} to ::shortcode directives
+    const preprocessed = preprocessPandocSyntax(text, { enableShortcodes: true })
+
+    const tree = fromMarkdown(preprocessed, {
+      extensions,
+      mdastExtensions,
+    })
+
+    return tree
+  },
+}
+
+// Default export for backward compatibility
+export const parser = quartoParser

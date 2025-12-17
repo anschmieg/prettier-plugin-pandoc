@@ -14,7 +14,11 @@
  *
  * This allows proper nesting support.
  */
-export function preprocessPandocSyntax(text: string): string {
+export interface PreprocessOptions {
+  enableShortcodes?: boolean
+}
+
+export function preprocessPandocSyntax(text: string, options: PreprocessOptions = { enableShortcodes: true }): string {
   const lines = text.split('\n')
   const result: string[] = []
   const divStack: number[] = [] // Track nesting depth
@@ -44,8 +48,19 @@ export function preprocessPandocSyntax(text: string): string {
           // or just output back $$ ... $$?
           // Let's output directive to be safe from swallowing.
 
-          const attrs = label ? `${label}` : ''
-          result.push(`::: math ${attrs}`.trim())
+          // Convert {#label} to {id="label"} for Directive compatibility
+          let attrs = ''
+          if (label) {
+            const idMatch = label.match(/^\{#(.+)\}$/)
+            if (idMatch) {
+              attrs = `{id="${idMatch[1]}"}`
+            }
+            else {
+              attrs = label // Fallback (though math labels are usually IDs)
+            }
+          }
+
+          result.push(`:::math${attrs}`.trim())
           result.push(...mathBuffer)
           result.push(':::')
 
@@ -67,7 +82,19 @@ export function preprocessPandocSyntax(text: string): string {
           if (singleLineMatch) {
             const content = singleLineMatch[1]
             const label = singleLineMatch[2] || ''
-            result.push(`::: math ${label}`.trim())
+
+            let attrs = ''
+            if (label) {
+              const idMatch = label.match(/^\{#(.+)\}$/)
+              if (idMatch) {
+                attrs = `{id="${idMatch[1]}"}`
+              }
+              else {
+                attrs = label
+              }
+            }
+
+            result.push(`:::math${attrs}`.trim())
             result.push(content)
             result.push(':::')
             continue
@@ -94,13 +121,15 @@ export function preprocessPandocSyntax(text: string): string {
 
     // 2. Handle Shortcodes {{< ... >}}
     // Convert to leaf directive: ::shortcode{raw="inner content"}
-    const shortcodeMatch = line.match(/^(\s*)\{\{< (.+) >\}\}(\s*)$/)
-    if (shortcodeMatch) {
-      const [, indent, content, trailing] = shortcodeMatch
-      // Escape quotes in content
-      const safeContent = content.replace(/"/g, '\\"')
-      result.push(`${indent}::shortcode{raw="${safeContent}"}${trailing}`)
-      continue
+    if (options.enableShortcodes) {
+      const shortcodeMatch = line.match(/^(\s*)\{\{< (.+) >\}\}(\s*)$/)
+      if (shortcodeMatch) {
+        const [, indent, content, trailing] = shortcodeMatch
+        // Escape quotes in content
+        const safeContent = content.replace(/"/g, '\\"')
+        result.push(`${indent}::shortcode{raw="${safeContent}"}${trailing}`)
+        continue
+      }
     }
 
     // 3. Existing Div Logic (Preserved)

@@ -1,6 +1,6 @@
 import type { Plugin } from 'prettier'
 import { astFormat } from './ast'
-import { parser } from './parser'
+import { pandocParser, quartoParser } from './parser'
 import { printer } from './printer'
 
 export default {
@@ -11,9 +11,15 @@ export default {
       extensions: ['.qmd'],
       vscodeLanguageIds: ['quarto'],
     },
+    {
+      name: 'Pandoc',
+      parsers: ['pandoc'],
+      vscodeLanguageIds: ['markdown'],
+    },
   ],
   parsers: {
-    quarto: parser,
+    quarto: quartoParser,
+    pandoc: pandocParser,
   },
   printers: {
     [astFormat]: printer,
