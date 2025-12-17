@@ -1,7 +1,7 @@
 {
   "name": "prettier-plugin-pandoc",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A Prettier plugin for Pandoc Markdown and Quarto documents",
   "author": "Adrian",
   "homepage": "https://github.com/anschmieg/prettier-plugin-pandoc#readme",
