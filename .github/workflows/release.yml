@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write # Required for OIDC / Trusted Publishing
 
     steps:
       - name: Checkout
@@ -17,8 +18,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22' # Node 22 includes npm 11+
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify npm version
+        run: npm --version
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
@@ -31,7 +35,5 @@ jobs:
       - name: Build
         run: bun run build
 
-      - name: Publish to npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish with OIDC
+        run: npm publish --provenance --access public
