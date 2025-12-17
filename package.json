@@ -7,7 +7,7 @@
   "homepage": "https://github.com/anschmieg/prettier-plugin-pandoc#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/anschmieg/prettier-plugin-pandoc"
+    "url": "git+https://github.com/anschmieg/prettier-plugin-pandoc.git"
   },
   "bugs": {
     "url": "https://github.com/anschmieg/prettier-plugin-pandoc/issues"
