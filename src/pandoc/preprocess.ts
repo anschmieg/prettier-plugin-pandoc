@@ -14,88 +14,113 @@
  *
  * This allows proper nesting support.
  */
+import { getProtectedRanges, isProtected } from './safety'
+
 export interface PreprocessOptions {
   enableShortcodes?: boolean
 }
 
 export function preprocessPandocSyntax(text: string, options: PreprocessOptions = { enableShortcodes: true }): string {
+  const protectedRanges = getProtectedRanges(text)
   const lines = text.split('\n')
   const result: string[] = []
   const divStack: number[] = [] // Track nesting depth
   let insideMathBlock = false
   let mathBuffer: string[] = []
 
+  let currentOffset = 0
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
+    // Calculate start offset of this line
+    // currentOffset is at the start of the line
 
     // 1. Handle Math Blocks with Labels
     if (line.trim().startsWith('$$')) {
-      if (insideMathBlock) {
-        // Closing the block
-        // Relaxed regex: Just check for $$ and optional {attributes}
-        // console.log('Checking close match for:', line)
-        const closeMatch = line.trim().match(/^\$\$\s*(\{.*\})?$/)
-        if (closeMatch) {
-          insideMathBlock = false
-          const label = closeMatch[1] // e.g. "{#eq-label}"
+      // Check if this line is protected (e.g. inside a code block)
+      // Check the position of '$$'
+      const matchIndex = line.indexOf('$$')
+      const absoluteMatchIndex = currentOffset + matchIndex
 
-          // Only treat as Labeled Math if it actually HAS a label,
-          // OR if we are forcing consistency.
-          // IF no label, we should probably output as standard math $$ to avoid Directive overhead?
-          // BUT if we mix them, printer logic gets complex.
-          // Let's standardise on Directive if it has a label.
-          // If it doesn't have a label, we can create a `math` directive without attrs,
-          // or just output back $$ ... $$?
-          // Let's output directive to be safe from swallowing.
+      if (!isProtected(absoluteMatchIndex, protectedRanges)) {
+        if (insideMathBlock) {
+          // Closing the block
+          // Relaxed regex: Just check for $$ and optional {attributes}
+          // console.log('Checking close match for:', line)
+          const closeMatch = line.trim().match(/^\$\$\s*(\{.*\})?$/)
+          if (closeMatch) {
+            insideMathBlock = false
+            const label = closeMatch[1] // e.g. "{#eq-label}"
 
-          // Convert to directive: :::math{#label} or :::math
-          // We rely on micromark-extension-directive to parse the attributes
-          const attrs = label || ''
-          result.push(`:::math${attrs}`)
-          result.push(...mathBuffer)
-          result.push(':::')
+            // Only treat as Labeled Math if it actually HAS a label,
+            // OR if we are forcing consistency.
+            // IF no label, we should probably output as standard math $$ to avoid Directive overhead?
+            // BUT if we mix them, printer logic gets complex.
+            // Let's standardise on Directive if it has a label.
+            // If it doesn't have a label, we can create a `math` directive without attrs,
+            // or just output back $$ ... $$?
+            // Let's output directive to be safe from swallowing.
 
-          mathBuffer = []
-          continue
-        }
-        else {
-          mathBuffer.push(line)
-          continue
-        }
-      }
-      else {
-        // Opening block
-        // Check single line $$ ... $$
-        if (line.trim().match(/^\$\$.+\$\$/)) {
-          // Single line math, pass through?
-          // But what if it has label? $$ E=mc^2 $$ {#eq}
-          const singleLineMatch = line.trim().match(/^\$\$(.+)\$\$\s*(\{.*\})?$/)
-          if (singleLineMatch) {
-            const content = singleLineMatch[1]
-            const label = singleLineMatch[2] || ''
+            // Convert to directive: :::math{#label} or :::math
+            // We rely on micromark-extension-directive to parse the attributes
+            // But verify we aren't protected! (We already did)
 
-            result.push(`:::math${label}`)
-            result.push(content)
+            const attrs = label || ''
+            result.push(`:::math${attrs}`)
+            result.push(...mathBuffer)
             result.push(':::')
+
+            mathBuffer = []
+            // Update offset and continue
+            currentOffset += line.length + 1 // +1 for newline
             continue
           }
-          // Plain single line, let pass
-          result.push(line)
-          continue
+          else {
+            mathBuffer.push(line)
+            // Update offset and continue
+            currentOffset += line.length + 1
+            continue
+          }
         }
+        else {
+          // Opening block
+          // Check single line $$ ... $$
+          if (line.trim().match(/^\$\$.+\$\$/)) {
+            // Single line math, pass through?
+            // But what if it has label? $$ E=mc^2 $$ {#eq}
+            const singleLineMatch = line.trim().match(/^\$\$(.+)\$\$\s*(\{.*\})?$/)
+            if (singleLineMatch) {
+              const content = singleLineMatch[1]
+              const label = singleLineMatch[2] || ''
 
-        // Block start
-        const openMatch = line.trim().match(/^\$\$\s*(\{.*\})?$/)
-        if (openMatch) {
-          insideMathBlock = true
-          // console.log('Opened math block')
-          continue
+              result.push(`:::math${label}`)
+              result.push(content)
+              result.push(':::')
+              currentOffset += line.length + 1
+              continue
+            }
+            // Plain single line, let pass
+            result.push(line)
+            currentOffset += line.length + 1
+            continue
+          }
+
+          // Block start
+          const openMatch = line.trim().match(/^\$\$\s*(\{.*\})?$/)
+          if (openMatch) {
+            insideMathBlock = true
+            // console.log('Opened math block')
+            currentOffset += line.length + 1
+            continue
+          }
         }
       }
+      // Else: Protected line starting with $$ (inside code block) - treat as normal text
     }
 
     if (insideMathBlock) {
       mathBuffer.push(line)
+      currentOffset += line.length + 1
       continue
     }
 
@@ -104,65 +129,86 @@ export function preprocessPandocSyntax(text: string, options: PreprocessOptions 
     if (options.enableShortcodes) {
       const shortcodeMatch = line.match(/^(\s*)\{\{< (.+) >\}\}(\s*)$/)
       if (shortcodeMatch) {
-        const [, indent, content, trailing] = shortcodeMatch
-        // Escape quotes in content
-        const safeContent = content.replace(/"/g, '\\"')
-        result.push(`${indent}::shortcode{raw="${safeContent}"}${trailing}`)
-        continue
+        // Check protection
+        const matchIndex = line.indexOf('{{<')
+        const absoluteMatchIndex = currentOffset + matchIndex
+
+        if (!isProtected(absoluteMatchIndex, protectedRanges)) {
+          const [, indent, content, trailing] = shortcodeMatch
+          // Escape quotes in content
+          const safeContent = content.replace(/"/g, '\\"')
+          result.push(`${indent}::shortcode{raw="${safeContent}"}${trailing}`)
+          currentOffset += line.length + 1
+          continue
+        }
       }
     }
 
     // 3. Existing Div Logic (Preserved)
+    // Div fences ":::" are tricky because they look like code blocks.
+    // However, in standard markdown, ":::" is text (paragraph).
+    // So getProtectedRanges WILL NOT mark ::: as code unless it's inside a code block.
+    // So we can safely process them checking isProtected.
+
     // Check closing fence FIRST (must be standalone, just colons)
     // Match closing fence: ::: (must be standalone)
     const closeMatch = line.match(/^(:{3,})\s*$/)
     if (closeMatch) {
-      const colons = closeMatch[1]
+      const matchIndex = line.indexOf(closeMatch[1])
+      if (!isProtected(currentOffset + matchIndex, protectedRanges)) {
+        const colons = closeMatch[1]
 
-      // Only process standard ::: fences
-      if (colons === ':::') {
-        // Pop from stack and use that colon count
-        const colonCount = divStack.pop() || 3
-        result.push(':'.repeat(colonCount))
-        continue
+        // Only process standard ::: fences
+        if (colons === ':::') {
+          // Pop from stack and use that colon count
+          const colonCount = divStack.pop() || 3
+          result.push(':'.repeat(colonCount))
+          currentOffset += line.length + 1
+          continue
+        }
       }
     }
 
     // Match opening fence: ::: optionally followed by name and/or {attributes}
     const openMatch = line.match(/^(:{3,})\s*(\w[\w-]*)?\s*(\{[^}]+\})?/)
     if (openMatch) {
-      const [, colons, name, attrs] = openMatch
+      const matchIndex = line.indexOf(openMatch[1])
+      if (!isProtected(currentOffset + matchIndex, protectedRanges)) {
+        const [, colons, name, attrs] = openMatch
 
-      // Only process standard ::: fences, not longer ones
-      if (colons === ':::') {
-        // Determine colon count based on nesting depth
-        // IMPORTANT: Use MORE colons for OUTER divs to ensure proper nesting
-        // micromark requires outer fences to be longer than inner ones
-        // Use decreasing colons: outer=5, inner=4, deeper=3
-        const depth = divStack.length
-        const colonCount = Math.max(3, 5 - depth) // 5 for depth 0, 4 for depth 1, 3 for depth 2+
-        const fenceColons = ':'.repeat(colonCount)
+        // Only process standard ::: fences, not longer ones
+        if (colons === ':::') {
+          // Determine colon count based on nesting depth
+          // IMPORTANT: Use MORE colons for OUTER divs to ensure proper nesting
+          // micromark requires outer fences to be longer than inner ones
+          // Use decreasing colons: outer=5, inner=4, deeper=3
+          const depth = divStack.length
+          const colonCount = Math.max(3, 5 - depth) // 5 for depth 0, 4 for depth 1, 3 for depth 2+
+          const fenceColons = ':'.repeat(colonCount)
 
-        // Push current depth to stack
-        divStack.push(colonCount)
+          // Push current depth to stack
+          divStack.push(colonCount)
 
-        // Build the directive line
-        const directiveName = name || 'div'
-        let directiveLine = `${fenceColons}${directiveName}`
+          // Build the directive line
+          const directiveName = name || 'div'
+          let directiveLine = `${fenceColons}${directiveName}`
 
-        if (attrs) {
-          // Remove outer braces from captured group
-          const attrContent = attrs.slice(1, -1).trim()
-          directiveLine += `{${attrContent}}`
+          if (attrs) {
+            // Remove outer braces from captured group
+            const attrContent = attrs.slice(1, -1).trim()
+            directiveLine += `{${attrContent}}`
+          }
+
+          result.push(directiveLine)
+          currentOffset += line.length + 1
+          continue
         }
-
-        result.push(directiveLine)
-        continue
       }
     }
 
     // Regular line, keep as-is
     result.push(line)
+    currentOffset += line.length + 1
   }
 
   // Close any dangling blocks (shouldn't happen in valid docs)
