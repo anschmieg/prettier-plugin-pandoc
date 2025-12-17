@@ -60,7 +60,7 @@ export function preprocessPandocSyntax(text: string): string {
         let directiveLine = `${fenceColons}${directiveName}`
 
         if (attrs) {
-          // Remove outer braces and leading dot/hash
+          // Remove outer braces from captured group
           const attrContent = attrs.slice(1, -1).trim()
           directiveLine += `{${attrContent}}`
         }
